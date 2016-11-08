@@ -13,3 +13,9 @@ Python小工具
 Nessus xml格式报告整理工具，生成三张表，①漏洞清单 ②按漏洞分类 ③按IP端口分类。
 
 ---
+
+**[Get_ip_os_service_from_nmapxml.py](https://github.com/Shad0wpf/SecTools/blob/master/Get_ip_os_service_from_nmapxml.py)**
+
+Nmap xml格式报告提取IP、操作系统、服务。
+
+---
