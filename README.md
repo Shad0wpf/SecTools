@@ -19,3 +19,9 @@ Nessus xml格式报告整理工具，生成三张表，①漏洞清单 ②按漏
 Nmap xml格式报告提取IP、操作系统、服务名称。
 
 ---
+
+**[shadow 批量提取&处理程序 by py3.zip](https://github.com/Shad0wpf/SecTools/blob/master/shadow 批量提取&处理程序 by py3.zip)**
+
+shadow 批量提取&处理程序
+
+---
