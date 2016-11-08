@@ -1,5 +1,7 @@
 #!/usr/bin/env python
 # encoding: utf-8
+# 2016.11.8 17:21 by drop 342737268(qq)
+
 
 import re
 import os
@@ -17,6 +19,7 @@ def install_pyexcel():
     path = os.environ.get('PATH')
     if sys.platform == 'linux':
         os.system('easy_install install pyexcel')
+        os.system('easy_install install pyexcel_xlsx')
     elif sys.platform == 'win32':
         if re.search(r'[Pp]ython\d+\\[Ss]cripts', path):
             os.system('pip install pyexcel')
@@ -46,14 +49,20 @@ class GetIPVuls(object):
         assert len(sys.argv) >= 2, 'CommandError {}'.format(sys.argv)
         self.fn = sys.argv[1]
         assert os.path.isfile(self.fn), 'File not exist %s' %self.fn
-        self.data = []
         # filter highest version
-        self.patt = re.compile(r'(\d+\.\d+\.\d+\.\d+)|(\d+\.\d+\.\d+)|(\d+\.\d+)')
         self.sheet1 = 'IP漏洞表'
         self.sheet2 = '漏洞分类表'
+        self.sheet3 = '端口分类表'
+        # raw_fmt = ("Plugin ID", "CVE", "CVSS", "Risk", "Host", "Protocol", "Port", "Name", "Synopsis", "Description", "Solution", "See Also", "Plugin Output")
+        self.sheet1_fmt = ("Host", "Protocol", "Name", "Port", "Risk", "CVE", "Synopsis", "Description", "Solution", "See Also", "Plugin Output", "Plugin ID")
+        self.sheet2_fmt = ("Name", "Host", "CVSS", "Risk", "CVE", "Protocol", "Synopsis", "Description", "Solution", "See Also", "Plugin Output", "Plugin ID")
+        self.sheet3_fmt = ("Host", "Protocol", "Name", "Port", "Risk", "CVE", "Synopsis", "Description", "Solution", "See Also", "Plugin Output", "Plugin ID")
         if COMPAT:
             self.sheet1 = self.sheet1.decode('utf-8')
             self.sheet2 = self.sheet2.decode('utf-8')
+            self.sheet3 = self.sheet3.decode('utf-8')
+        self.patt = re.compile(r'(\d+\.\d+\.\d+\.\d+)|(\d+\.\d+\.\d+)|(\d+\.\d+)')
+        self.data = []
         self.run()
 
     def run(self):
@@ -70,6 +79,8 @@ class GetIPVuls(object):
         self.filter_pluginID()
         self.filter_upgrade()
         self.collect_ip()
+        self.get_iptables()
+        self.resort_column()
         self.build_xlsx()
 
     def filter_level(self, csv_reader):
@@ -111,7 +122,7 @@ class GetIPVuls(object):
         print('[stage3] Collected {} lines.'.format(len(data)))
 
     def sort_host_name_ver(self, line):
-        """ sorted key function """
+        """ sorted key function for filter_upgrade """
         host = line[self.idx_host]
         name = line[self.idx_name]
         lst = self.patt.findall(name)
@@ -134,7 +145,7 @@ class GetIPVuls(object):
         for i in self.data[self.sheet1]:
             name = i[idx_name]
             if not vuls.get(i[idx_name]):
-                vuls[name] = i
+                vuls[name] = i[:]
                 vuls[name][idx] = 1
                 continue
             vuls[name][idx_host] += ', {}'.format(i[idx_host])
@@ -144,19 +155,46 @@ class GetIPVuls(object):
             self.data[self.sheet2].append(i)
         print('[state4] collect ip successful! Collected {} lines.'.format(len(vuls)))
 
+    def get_iptables(self):
+        result = []
+        data = self.data[self.sheet1][:]
+        data = sorted(data, key=self.sort_host_port_risk, reverse=True)
+        host = self.idx_host
+        port = self.idx_port
+        for k, g in itertools.groupby(data, key=operator.itemgetter(host, port)):
+            result.append(next(g))
+        self.data[self.sheet3] = result
+        print('[state5] get iptables successful!')
+
+    def sort_host_port_risk(self, line):
+        """sorted key function for get_iptables"""
+        host = line[self.idx_host]
+        port = line[self.idx_port]
+        risk = line[self.idx_risk]
+        risk_num = {"严重": '9', "高危": '6', "中危": '3'}
+        return host + port + risk_num[risk]
+
+    def resort_column(self):
+        cn = {"Plugin ID": "Plugin ID", "CVE": "CVE", "CVSS": "IP计数", "Risk": "风险", "Host": "IP", "Protocol": "协议", "Port": "端口", "Name": "漏洞", "Synopsis": "摘要", "Description": "描述", "Solution": "解决方案", "See Also": "参考", "Plugin Output": "数据包"}
+        self.data[self.sheet1] = self.sort_column(cn, self.sheet1_fmt, self.data[self.sheet1])
+        self.data[self.sheet2] = self.sort_column(cn, self.sheet2_fmt, self.data[self.sheet2])
+        self.data[self.sheet3] = self.sort_column(cn, self.sheet3_fmt, self.data[self.sheet3])
+        print('[state6] resort column successful!')
+
+    def sort_column(self, cn, fmt, data):
+        raw = self.heading
+        head = [cn[i] for i in fmt]
+        idx = tuple([raw.index(i) for i in fmt])
+        get_line = operator.itemgetter(*idx)
+        sheet = [head]
+        for i in data:
+            sheet.append(get_line(i[:]))
+        return sheet
+
     def build_xlsx(self):
-        idx = self.idx_cvss
-        # remove cvss from sheet1
-        for i in range(len(self.data[self.sheet1])):
-            line = self.data[self.sheet1][i]
-            self.data[self.sheet1][i] = line[0: idx] + line[idx+1: ]
-        heading = ["Plugin ID", "CVE", "风险", "IP", "协议", "端口", "漏洞", "摘要", "描述", "解决方案", "参考", "数据包"]
-        heading2 = ["Plugin ID", "CVE", "IP计数", "风险", "IP", "协议", "端口", "漏洞", "摘要", "描述", "解决方案", "参考", "数据包"]
-        self.data[self.sheet1].insert(0, heading)
-        self.data[self.sheet2].insert(0, heading2)
         dest = self.fn.split('.csv')[0] + '.xlsx'
         pyexcel.save_book_as(bookdict=self.data, dest_file_name=dest)
-        print('[state5] build file "{}" successful!'.format(dest))
+        print('[state7] build file "{}" successful!'.format(dest))
 
 
 if __name__ == '__main__':
