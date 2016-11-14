@@ -2,7 +2,6 @@
 # encoding: utf-8
 # 2016.11.8 17:21 by drop 342737268(qq)
 
-
 import re
 import os
 import sys
@@ -15,33 +14,34 @@ COMPAT = False
 if '2.7' in sys.version:
     COMPAT = True
 
-def install_pyexcel():
+
+def get_module(modules):
+    """:modules: list, install module list"""
+    for i in modules:
+        os.system('pip install {}'.format(i))
+    print('\n\t**Decpendencies may be ok, please run me again!**')
+    sys.exit()
+
+
+def install_module(modules):
     path = os.environ.get('PATH')
     if sys.platform == 'linux':
-        os.system('easy_install install pyexcel')
-        os.system('easy_install install pyexcel_xlsx')
+        os.system('easy_install pip')
     elif sys.platform == 'win32':
-        if re.search(r'[Pp]ython\d+\\[Ss]cripts', path):
-            os.system('pip install pyexcel')
-            os.system('pip install pyexcel_xlsx')
-            return 0
-        path = re.search(r'[CcDdEeFfGg]:\\.+?[Pp]ython\d+\\', path)
-        if path:
-            os.chdir(path.group() + 'Scripts')
+        path_py = re.search(r'[CcDdEeFfGg]:\\[Pp]ython\d+\\?', path)
+        path_pip = re.search(r'[Pp]ython\d+\\[Ss]cripts', path)
+        if (not path_pip) and path_py:
+            os.chdir(os.path.join(path_py.group(), 'Scripts'))
             if not os.path.isfile('./pip.exe'):
                 print('Please reinstall python!')
                 return 0
-            os.system('pip install pyexcel')
-            os.system('pip install pyexcel_xlsx')
-    return 1
+    get_module(modules)
 
 try:
     import pyexcel
-    import pyexcel_xlsx
 except:
-    install_pyexcel()
-    import pyexcel
-    import pyexcel_xlsx
+    modules = ['pyexcel', 'pyexcel_xlsx']
+    install_module(modules)
 
 
 class GetIPVuls(object):
@@ -54,13 +54,14 @@ class GetIPVuls(object):
         self.sheet2 = '漏洞分类表'
         self.sheet3 = '端口分类表'
         # raw_fmt = ("Plugin ID", "CVE", "CVSS", "Risk", "Host", "Protocol", "Port", "Name", "Synopsis", "Description", "Solution", "See Also", "Plugin Output")
-        self.sheet1_fmt = ("Host", "Protocol", "Name", "Port", "Risk", "CVE", "Synopsis", "Description", "Solution", "See Also", "Plugin Output", "Plugin ID")
+        self.sheet1_fmt = ("Host", "Protocol", "Port", "Name", "Risk", "CVE", "Synopsis", "Description", "Solution", "See Also", "Plugin Output", "Plugin ID")
         self.sheet2_fmt = ("Name", "Host", "CVSS", "Risk", "CVE", "Protocol", "Synopsis", "Description", "Solution", "See Also", "Plugin Output", "Plugin ID")
-        self.sheet3_fmt = ("Host", "Protocol", "Name", "Port", "Risk", "CVE", "Synopsis", "Description", "Solution", "See Also", "Plugin Output", "Plugin ID")
+        self.sheet3_fmt = ("Host", "Protocol", "Port", "Name", "Risk", "CVE", "Synopsis", "Description", "Solution", "See Also", "Plugin Output", "Plugin ID")
         if COMPAT:
             self.sheet1 = self.sheet1.decode('utf-8')
             self.sheet2 = self.sheet2.decode('utf-8')
             self.sheet3 = self.sheet3.decode('utf-8')
+        # patt for version like 3.4.2p4
         self.patt = re.compile(r'(\d+\.\d+\.\d+\.\d+)|(\d+\.\d+\.\d+)|(\d+\.\d+)')
         self.data = []
         self.run()
@@ -86,12 +87,14 @@ class GetIPVuls(object):
     def filter_level(self, csv_reader):
         """ remove vulnerability of level with 'low' or 'None' """
         risk = {"Critical": "严重", "High": "高危", "Medium": "中危"}
-        idx = self.idx_risk
+        idx, idx_port, idx_name = self.idx_risk, self.idx_port, self.idx_name
         for i in csv_reader:
             if i[self.idx_risk] in ('Low', 'None'):
                 continue
-            if 'PCI' in i[self.idx_name]:
+            if 'PCI' in i[idx_name]:
                 continue
+            if i[idx_port] == '0':
+                i[idx_port] = ''
             i[idx] = risk[i[idx]]
             self.data.append(i)
         print('[stage1] remove level (low, None) vulnerability) finished!')
