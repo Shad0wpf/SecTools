@@ -1,11 +1,13 @@
 #!/usr/bin/env python3
 # coding: utf-8
 # 2016-10-19 14:17:16
+# update @ 2016-11-16 15:30 
 
 import re
 import os
 import sys
 import time
+ISOTIMEFORMAT='%Y%m%d_%H%M'
 
 COMPAT = False
 if '2.7' in sys.version:
@@ -112,7 +114,7 @@ def get_xlsx(curent_dir):
     wdata = []
     wdata.append(['IP', '端口', '协议', '服务', '风险', '漏洞'])
     wdata.extend(traverse_dir(curent_dir))
-    wfile = 'iptables@{}.xlsx'.format(int(time.time()))
+    wfile = 'iptables@{}.xlsx'.format(time.strftime(ISOTIMEFORMAT, time.localtime(time.time())))
     try:
         pyexcel.save_as(array=wdata, dest_file_name=wfile)
     except:
